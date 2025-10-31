@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Button, FlatList, ListRenderItemInfo, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Button, FlatList, ListRenderItemInfo, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { fetchRewards } from '../api/helloAgainApi';
@@ -23,16 +23,27 @@ export default function RewardsListScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const loadPage = useCallback(async (p: number, append: boolean) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoadingInitial(true);
+      setPage(p);
+    }
+
     try {
-      const res = await fetchRewards({ limit: PAGE_SIZE, page: p, filterWithoutImages: true });
+      const res = await fetchRewards({ limit: PAGE_SIZE, page: p });
       setHasMore(res.hasMore);
       setItems((prev) => (append ? [...prev, ...res.items] : res.items));
+      setPage(p);
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load rewards');
     } finally {
-      setLoadingInitial(false);
-      setLoadingMore(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoadingInitial(false);
+      }
     }
   }, []);
 
@@ -49,12 +60,10 @@ export default function RewardsListScreen() {
   }, [navigation]);
 
   const onEndReached = useCallback(() => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || items.length === 0) return;
     const next = page + 1;
-    setLoadingMore(true);
-    setPage(next);
     loadPage(next, true);
-  }, [hasMore, loadingMore, page, loadPage]);
+  }, [hasMore, items.length, loadingMore, page, loadPage]);
 
   const keyExtractor = useCallback((item: Reward) => item.id, []);
 
@@ -94,6 +103,13 @@ export default function RewardsListScreen() {
       removeClippedSubviews
       contentContainerStyle={styles.listContent}
       ListFooterComponent={loadingMore ? <ActivityIndicator /> : null}
+      ListEmptyComponent={
+        !loadingInitial && !error ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>No rewards available</Text>
+          </View>
+        ) : null
+      }
     />
   );
 }
@@ -101,6 +117,7 @@ export default function RewardsListScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 8 },
+  emptyText: { color: '#555' },
 });
 
 
